@@ -17,9 +17,9 @@ type Link struct {
 
 type Crawler struct {
     depth int
-    all chan Link
-    seen chan Link
-    unseen chan Link
+    all chan *Link
+    seen chan *Link
+    unseen chan *Link
 }
 
 func absURL(href, parent string) (string, error) {
@@ -44,8 +44,8 @@ func extractAttr(t html.Token, attr string) string {
     return ""
 }
 
-func extractLinks(url string, body io.Reader) []Link {
-    links := make([]Link, 0)
+func extractLinks(url string, body io.Reader) []*Link {
+    links := make([]*Link, 0)
     z := html.NewTokenizer(body)
     for {
         tt := z.Next()
@@ -63,7 +63,7 @@ func extractLinks(url string, body io.Reader) []Link {
                 if err != nil {
                     continue
                 }
-                links = append(links, Link{href, url, t.Data == "script"})
+                links = append(links, &Link{href, url, t.Data == "script"})
             } else if t.Data == "link" {
                 rel := extractAttr(t, "rel")
                 href := extractAttr(t, "href")
@@ -74,14 +74,14 @@ func extractLinks(url string, body io.Reader) []Link {
                 if err != nil {
                     continue
                 }
-                links = append(links, Link{href, url, true})
+                links = append(links, &Link{href, url, true})
             }
         }
     }
     return links
 }
 
-func visit(url string, queue chan Link) {
+func visit(url string, queue chan *Link) {
     resp, err := http.Get(url)
     if err != nil {
         fmt.Println(err)
@@ -92,7 +92,7 @@ func visit(url string, queue chan Link) {
     links := extractLinks(url, resp.Body)
 
     for _, link := range links {
-        go func(link Link) {
+        go func(link *Link) {
             queue <- link
         }(link)
     }
@@ -106,7 +106,7 @@ func getDomain(href string) (string, error) {
     return url.Host, nil
 }
 
-func distributor(all, seen, unseen chan Link) {
+func distributor(all, seen, unseen chan *Link) {
     seenMap := make(map[string]bool)
     for link := range all {
         if seenMap[link.url] {
@@ -121,14 +121,14 @@ func distributor(all, seen, unseen chan Link) {
 func NewCrawler(depth int) *Crawler {
     return &Crawler{
         depth: depth,
-        all: make(chan Link),
-        seen: make(chan Link),
-        unseen: make(chan Link),
+        all: make(chan *Link),
+        seen: make(chan *Link),
+        unseen: make(chan *Link),
     }
 }
 
 func (c *Crawler) Crawl(url string) {
-    startLink := Link{url: url}
+    startLink := &Link{url: url}
     seen := 0
 
     parentDomain, err := getDomain(url)
