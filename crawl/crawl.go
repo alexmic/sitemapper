@@ -15,6 +15,7 @@ type Sitemap struct {
     mux *sync.Mutex
 }
 
+// Constructs a new sitemap.
 func newSitemap() *Sitemap {
     return &Sitemap{
         entries: make(map[string]map[string]bool),
@@ -22,6 +23,7 @@ func newSitemap() *Sitemap {
     }
 }
 
+// Adds a `Link` to the sitemap in a thread-safe manner.
 func (s *Sitemap) AddLink(link *Link) {
     s.mux.Lock()
     defer s.mux.Unlock()
@@ -32,6 +34,7 @@ func (s *Sitemap) AddLink(link *Link) {
     s.entries[link.parentUrl][link.url] = link.isAsset
 }
 
+// A convenience method to pretty-print a sitemap.
 func (s *Sitemap) PrettyPrint() {
     for parentUrl, children := range(s.entries) {
         if parentUrl == "" {
@@ -59,6 +62,9 @@ type Crawler struct {
     queue chan *Link
 }
 
+// Transforms a URL to an absolute URL given its parent. If the
+// URL is already an absolute URL (which could be in a different
+// domain) it is returned as is.
 func absURL(href, parent string) (string, error) {
     url, err := url.Parse(href)
     if err != nil {
@@ -72,6 +78,8 @@ func absURL(href, parent string) (string, error) {
     return resolved.String(), nil
 }
 
+// Extracts an attribute from an HTML token. Returns an empty
+// string if the attribute is not found.
 func extractAttr(t html.Token, attr string) string {
     for _, a := range t.Attr {
         if a.Key == attr {
@@ -81,6 +89,9 @@ func extractAttr(t html.Token, attr string) string {
     return ""
 }
 
+// Extracts and returns a list of absolute URLs (links and assets)
+// from an HTML document. Accepts a reader as it is returned from
+// the HTTP client.
 func extractLinks(url string, body io.Reader) []*Link {
     links := make([]*Link, 0)
     z := html.NewTokenizer(body)
@@ -92,6 +103,9 @@ func extractLinks(url string, body io.Reader) []*Link {
         case tt == html.StartTagToken:
             t := z.Token()
             if t.Data == "a" || t.Data == "script" {
+                // Extract anchor and script tags but discard everything
+                // without an href since they could be broken links or
+                // inline scripts.
                 href := extractAttr(t, "href")
                 if href == "" {
                     continue
@@ -102,6 +116,7 @@ func extractLinks(url string, body io.Reader) []*Link {
                 }
                 links = append(links, &Link{href, url, t.Data == "script"})
             } else if t.Data == "link" {
+                // Extract link tags but limit the set to just stylesheets.
                 rel := extractAttr(t, "rel")
                 href := extractAttr(t, "href")
                 if href == "" || rel != "stylesheet" {
@@ -118,6 +133,7 @@ func extractLinks(url string, body io.Reader) []*Link {
     return links
 }
 
+// Visits a URL and enqueues extracted links for further processing.
 func visit(url string, queue chan *Link, wg *sync.WaitGroup) {
     defer wg.Done()
 
@@ -134,6 +150,7 @@ func visit(url string, queue chan *Link, wg *sync.WaitGroup) {
     }
 }
 
+// Given a URL it returns its domain.
 func getDomain(href string) (string, error) {
     url, err := url.Parse(href)
     if err != nil {
@@ -143,6 +160,7 @@ func getDomain(href string) (string, error) {
     return tokens[0], nil
 }
 
+// Constructs a new Crawler.
 func NewCrawler(depth int) *Crawler {
     return &Crawler{
         depth: depth,
@@ -150,6 +168,10 @@ func NewCrawler(depth int) *Crawler {
     }
 }
 
+// Crawl crawls a start URL for all links and assets and builds
+// a sitemap with pages and assets per crawled link. Links are
+// restricted to the same domain but assets are not since they
+// are likely to be served by a CDN.
 func (c *Crawler) Crawl(url string) (*Sitemap, error) {
     sitemap := newSitemap()
 
@@ -165,6 +187,8 @@ func (c *Crawler) Crawl(url string) (*Sitemap, error) {
     wg.Add(1)
     go visit(url, c.queue, wg)
 
+    // Waits for all goroutines to finish and signals the fact to
+    // the `done` channel in order to terminate the select loop.
     go func() {
         wg.Wait()
         done <- true
@@ -178,12 +202,14 @@ func (c *Crawler) Crawl(url string) (*Sitemap, error) {
                 continue
             }
 
+            // We allow assets to come from a different domain.
             if !link.isAsset && linkDomain != parentDomain {
                 continue
             }
 
             sitemap.AddLink(link)
 
+            // Ensures we don't visit URLs twice.
             if seen[link.url] {
                 continue
             }
