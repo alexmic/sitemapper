@@ -4,10 +4,49 @@ import (
     "fmt"
     "io"
     "time"
+    "sync"
     "golang.org/x/net/html"
     "net/http"
     "net/url"
 )
+
+type Sitemap struct {
+    entries map[string]map[string]bool
+    mux *sync.Mutex
+}
+
+func newSitemap() *Sitemap {
+    return &Sitemap{
+        entries: make(map[string]map[string]bool),
+        mux: &sync.Mutex{},
+    }
+}
+
+func (s *Sitemap) AddLink(link *Link) {
+    s.mux.Lock()
+    defer s.mux.Unlock()
+    _, ok := s.entries[link.parentUrl]
+    if (!ok) {
+        s.entries[link.parentUrl] = make(map[string]bool)
+    }
+    s.entries[link.parentUrl][link.url] = link.isAsset
+}
+
+func (s *Sitemap) PrettyPrint() {
+    for parentUrl, children := range(s.entries) {
+        if parentUrl == "" {
+            continue
+        }
+        fmt.Printf("=> %s\n", parentUrl)
+        for url, isAsset := range(children) {
+            isAssetStr := "PAGE"
+            if isAsset {
+                isAssetStr = "ASSET"
+            }
+            fmt.Printf("  -> [%s] %s\n", isAssetStr, url)
+        }
+    }
+}
 
 type Link struct {
     url string
@@ -112,6 +151,7 @@ func NewCrawler(depth int) *Crawler {
 
 func (c *Crawler) Crawl(url string) (*Sitemap, error) {
     seen := make(map[string]bool)
+    sitemap := newSitemap()
 
     parentDomain, err := getDomain(url)
     if (err != nil) {
@@ -133,6 +173,8 @@ func (c *Crawler) Crawl(url string) (*Sitemap, error) {
             if !link.isAsset && linkDomain != parentDomain {
                 continue
             }
+
+            sitemap.AddLink(link)
 
             if seen[link.url] {
                 continue
