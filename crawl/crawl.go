@@ -1,6 +1,7 @@
 package crawl
 
 import (
+	"log"
 	"fmt"
 	"net/http"
 	"sync"
@@ -123,6 +124,7 @@ func visit(url string, queue chan *Link, wg *sync.WaitGroup) {
 
 	resp, err := http.Get(url)
 	if err != nil {
+		log.Print("Error in fetching url: %s", err)
 		return
 	}
 	defer resp.Body.Close()
