@@ -1,12 +1,13 @@
 package main
 
 import (
+	"log"
+	"net/url"
+	"os"
+	"strings"
+
 	"github.com/alexmic/sitemapper/crawl"
 	"github.com/codegangsta/cli"
-	"os"
-    "log"
-    "strings"
-    "net/url"
 )
 
 func main() {
@@ -17,24 +18,28 @@ func main() {
 
 	app.Action = func(c *cli.Context) {
 		rawurl := c.Args().Get(0)
-        if rawurl == "" {
-            log.Fatal("Please give a URL to crawl.")
-            os.Exit(1)
-        }
-        url, err := url.Parse(rawurl)
-        if err != nil {
-            log.Fatal(err)
-            os.Exit(1)
-        }
-        if url.Scheme == "" {
-            url.Scheme = "http"
-        }
-        absUrl := url.String()
-        if !strings.HasSuffix(absUrl, "/") {
-            absUrl += "/"
-        }
+		if rawurl == "" {
+			log.Fatal("Please give a URL to crawl.")
+			os.Exit(1)
+		}
+		url, err := url.Parse(rawurl)
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
+		if url.Scheme == "" {
+			url.Scheme = "http"
+		}
+		absUrl := url.String()
+		if !strings.HasSuffix(absUrl, "/") {
+			absUrl += "/"
+		}
 		crawler := crawl.NewCrawler(2)
-		sitemap, _ := crawler.Crawl(absUrl)
+		sitemap, err := crawler.Crawl(absUrl)
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
 		sitemap.PrettyPrint()
 	}
 
