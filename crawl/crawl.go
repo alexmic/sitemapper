@@ -3,8 +3,8 @@ package crawl
 import (
     "fmt"
     "io"
-    "time"
     "sync"
+    "strings"
     "golang.org/x/net/html"
     "net/http"
     "net/url"
@@ -118,7 +118,9 @@ func extractLinks(url string, body io.Reader) []*Link {
     return links
 }
 
-func visit(url string, queue chan *Link) {
+func visit(url string, queue chan *Link, wg *sync.WaitGroup) {
+    defer wg.Done()
+
     resp, err := http.Get(url)
     if err != nil {
         return
@@ -128,9 +130,7 @@ func visit(url string, queue chan *Link) {
     links := extractLinks(url, resp.Body)
 
     for _, link := range links {
-        go func(link *Link) {
-            queue <- link
-        }(link)
+        queue <- link
     }
 }
 
@@ -139,7 +139,8 @@ func getDomain(href string) (string, error) {
     if err != nil {
         return "", err
     }
-    return url.Host, nil
+    tokens := strings.Split(url.Host, ":")
+    return tokens[0], nil
 }
 
 func NewCrawler(depth int) *Crawler {
@@ -150,16 +151,23 @@ func NewCrawler(depth int) *Crawler {
 }
 
 func (c *Crawler) Crawl(url string) (*Sitemap, error) {
-    seen := make(map[string]bool)
     sitemap := newSitemap()
+
+    wg := &sync.WaitGroup{}
+    done := make(chan bool)
+    seen := make(map[string]bool)
 
     parentDomain, err := getDomain(url)
     if (err != nil) {
         return nil, err
     }
 
+    wg.Add(1)
+    go visit(url, c.queue, wg)
+
     go func() {
-        c.queue <- &Link{url: url}
+        wg.Wait()
+        done <- true
     }()
 
     for {
@@ -179,10 +187,11 @@ func (c *Crawler) Crawl(url string) (*Sitemap, error) {
             if seen[link.url] {
                 continue
             }
-
             seen[link.url] = true
-            go visit(link.url, c.queue)
-        case <- time.After(10000 * time.Millisecond):
+
+            wg.Add(1)
+            go visit(link.url, c.queue, wg)
+        case <- done:
             return sitemap, nil
         }
     }
