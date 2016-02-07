@@ -17,9 +17,7 @@ type Link struct {
 
 type Crawler struct {
     depth int
-    all chan *Link
-    seen chan *Link
-    unseen chan *Link
+    queue chan *Link
 }
 
 func absURL(href, parent string) (string, error) {
@@ -84,7 +82,6 @@ func extractLinks(url string, body io.Reader) []*Link {
 func visit(url string, queue chan *Link) {
     resp, err := http.Get(url)
     if err != nil {
-        fmt.Println(err)
         return
     }
     defer resp.Body.Close()
@@ -106,54 +103,45 @@ func getDomain(href string) (string, error) {
     return url.Host, nil
 }
 
-func distributor(all, seen, unseen chan *Link) {
-    seenMap := make(map[string]bool)
-    for link := range all {
-        if seenMap[link.url] {
-            seen <- link
-        } else {
-            seenMap[link.url] = true
-            unseen <- link
-        }
-    }
-}
-
 func NewCrawler(depth int) *Crawler {
     return &Crawler{
         depth: depth,
-        all: make(chan *Link),
-        seen: make(chan *Link),
-        unseen: make(chan *Link),
+        queue: make(chan *Link),
     }
 }
 
-func (c *Crawler) Crawl(url string) {
-    startLink := &Link{url: url}
-    seen := 0
+func (c *Crawler) Crawl(url string) (*Sitemap, error) {
+    seen := make(map[string]bool)
 
     parentDomain, err := getDomain(url)
     if (err != nil) {
-        return
+        return nil, err
     }
 
     go func() {
-        c.all <- startLink
+        c.queue <- &Link{url: url}
     }()
-
-    go distributor(c.all, c.seen, c.unseen)
 
     for {
         select {
-        case link := <- c.unseen:
+        case link := <- c.queue:
             linkDomain, err := getDomain(link.url)
-            if err == nil && linkDomain == parentDomain {
-                fmt.Println("VISITING", link.url)
-                go visit(link.url, c.all)
+            if err != nil {
+                continue
             }
-        case <- c.seen:
-            seen++
+
+            if !link.isAsset && linkDomain != parentDomain {
+                continue
+            }
+
+            if seen[link.url] {
+                continue
+            }
+
+            seen[link.url] = true
+            go visit(link.url, c.queue)
         case <- time.After(10000 * time.Millisecond):
-            return
+            return sitemap, nil
         }
     }
 }
