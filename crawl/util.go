@@ -36,32 +36,30 @@ func ExtractLinks(url string, body io.Reader) []*Link {
 			return links
 		case tt == html.StartTagToken:
 			t := z.Token()
-			if t.Data == "a" || t.Data == "script" {
-				// Extract anchor and script tags but discard everything
-				// without an href since they could be broken links or
-				// inline scripts.
-				href := extractAttr(t, "href")
-				if href == "" {
-					continue
-				}
-				href, err := AbsURL(href, url)
-				if err != nil {
-					continue
-				}
-				links = append(links, &Link{href, url, t.Data == "script"})
+			isAsset := false
+			href := ""
+			if t.Data == "a" {
+				href = extractAttr(t, "href")
+			} else if t.Data == "script" {
+				href = extractAttr(t, "src")
+				isAsset = true
 			} else if t.Data == "link" {
 				// Extract link tags but limit the set to just stylesheets.
 				rel := extractAttr(t, "rel")
-				href := extractAttr(t, "href")
-				if href == "" || rel != "stylesheet" {
+				if rel != "stylesheet" {
 					continue
 				}
-				href, err := AbsURL(href, url)
-				if err != nil {
-					continue
-				}
-				links = append(links, &Link{href, url, true})
+				href = extractAttr(t, "href")
+				isAsset = true
 			}
+			if href == "" {
+				continue
+			}
+			href, err := AbsURL(href, url)
+			if err != nil {
+				continue
+			}
+			links = append(links, &Link{href, url, isAsset})
 		}
 	}
 	return links
