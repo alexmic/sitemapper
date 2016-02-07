@@ -77,7 +77,7 @@ func (c *Crawler) Crawl(url string) (*Sitemap, error) {
 				continue
 			}
 
-			sitemap.AddLink(link)
+			sitemap.AddEntry(link.url, link.parentUrl, link.isAsset)
 
 			// Ensures we don't visit URLs twice.
 			if seen[link.url] {
@@ -94,14 +94,14 @@ func (c *Crawler) Crawl(url string) (*Sitemap, error) {
 }
 
 // Adds a `Link` to the sitemap in a thread-safe manner.
-func (s *Sitemap) AddLink(link *Link) {
+func (s *Sitemap) AddEntry(url, parentUrl string, isAsset bool) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	_, ok := s.entries[link.parentUrl]
+	_, ok := s.entries[parentUrl]
 	if !ok {
-		s.entries[link.parentUrl] = make(map[string]bool)
+		s.entries[parentUrl] = make(map[string]bool)
 	}
-	s.entries[link.parentUrl][link.url] = link.isAsset
+	s.entries[parentUrl][url] = isAsset
 }
 
 // A convenience method to pretty-print a sitemap.
