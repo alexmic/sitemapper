@@ -7,7 +7,6 @@ import (
 )
 
 type Crawler struct {
-	depth int
 	queue chan *Link
 }
 
@@ -23,11 +22,8 @@ type Link struct {
 }
 
 // Constructs a new Crawler.
-func NewCrawler(depth int) *Crawler {
-	return &Crawler{
-		depth: depth,
-		queue: make(chan *Link),
-	}
+func NewCrawler() *Crawler {
+	return &Crawler{queue: make(chan *Link)}
 }
 
 // Constructs a new Sitemap.

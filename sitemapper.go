@@ -34,7 +34,7 @@ func main() {
 		if !strings.HasSuffix(absUrl, "/") {
 			absUrl += "/"
 		}
-		crawler := crawl.NewCrawler(2)
+		crawler := crawl.NewCrawler()
 		sitemap, err := crawler.Crawl(absUrl)
 		if err != nil {
 			log.Fatal(err)
