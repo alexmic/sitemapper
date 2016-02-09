@@ -1,7 +1,6 @@
 package crawl
 
 import (
-	"log"
 	"fmt"
 	"net/http"
 	"sync"
@@ -109,9 +108,11 @@ func (s *Sitemap) PrettyPrint() {
 func visit(url string, queue chan *Link, wg *sync.WaitGroup) {
 	defer wg.Done()
 
+	fmt.Println("Visiting", url)
+
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Print("Error in fetching url: %s", err)
+		fmt.Println(err)
 		return
 	}
 	defer resp.Body.Close()
