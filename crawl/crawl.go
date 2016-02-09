@@ -38,6 +38,7 @@ func GetSitemap(url string) (*Sitemap, error) {
 	}
 
 	wg.Add(1)
+	seen[url] = true
 	go visit(url, queue, wg)
 
 	// Waits for all goroutines to finish and signals the fact to
