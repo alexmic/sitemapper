@@ -7,6 +7,12 @@ import (
 	"strings"
 )
 
+type Link struct {
+	url       string
+	parentUrl string
+	isAsset   bool
+}
+
 // Transforms a URL to an absolute URL given its parent. If the
 // URL is already an absolute URL (which could be in a different
 // domain) it is returned as is.
@@ -62,7 +68,6 @@ func ExtractLinks(url string, body io.Reader) []*Link {
 			links = append(links, &Link{href, url, isAsset})
 		}
 	}
-	return links
 }
 
 // Given a URL it returns its domain.

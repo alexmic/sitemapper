@@ -12,12 +12,6 @@ type Sitemap struct {
 	mux     *sync.Mutex
 }
 
-type Link struct {
-	url       string
-	parentUrl string
-	isAsset   bool
-}
-
 // Constructs a new Sitemap.
 func NewSitemap() *Sitemap {
 	return &Sitemap{
