@@ -7,10 +7,6 @@ import (
 	"sync"
 )
 
-type Crawler struct {
-	queue chan *Link
-}
-
 type Sitemap struct {
 	entries map[string]map[string]bool
 	mux     *sync.Mutex
@@ -22,11 +18,6 @@ type Link struct {
 	isAsset   bool
 }
 
-// Constructs a new Crawler.
-func NewCrawler() *Crawler {
-	return &Crawler{queue: make(chan *Link)}
-}
-
 // Constructs a new Sitemap.
 func NewSitemap() *Sitemap {
 	return &Sitemap{
@@ -35,16 +26,18 @@ func NewSitemap() *Sitemap {
 	}
 }
 
-// Crawl crawls a start URL for all links and assets and builds
+// Sitemap crawls a start URL for all links and assets and builds
 // a sitemap with pages and assets per crawled link. Links are
 // restricted to the same domain but assets are not since they
 // are likely to be served by a CDN.
-func (c *Crawler) Crawl(url string) (*Sitemap, error) {
+func GetSitemap(url string) (*Sitemap, error) {
 	sitemap := NewSitemap()
 
 	wg := &sync.WaitGroup{}
+
 	done := make(chan bool)
 	seen := make(map[string]bool)
+	queue := make(chan *Link)
 
 	parentDomain, err := GetDomain(url)
 	if err != nil {
@@ -52,7 +45,7 @@ func (c *Crawler) Crawl(url string) (*Sitemap, error) {
 	}
 
 	wg.Add(1)
-	go visit(url, c.queue, wg)
+	go visit(url, queue, wg)
 
 	// Waits for all goroutines to finish and signals the fact to
 	// the `done` channel in order to terminate the select loop.
@@ -63,7 +56,7 @@ func (c *Crawler) Crawl(url string) (*Sitemap, error) {
 
 	for {
 		select {
-		case link := <-c.queue:
+		case link := <- queue:
 			linkDomain, err := GetDomain(link.url)
 			if err != nil {
 				continue
@@ -83,8 +76,8 @@ func (c *Crawler) Crawl(url string) (*Sitemap, error) {
 			seen[link.url] = true
 
 			wg.Add(1)
-			go visit(link.url, c.queue, wg)
-		case <-done:
+			go visit(link.url,  queue, wg)
+		case <- done:
 			return sitemap, nil
 		}
 	}

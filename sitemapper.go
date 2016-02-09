@@ -34,13 +34,12 @@ func main() {
 		if !strings.HasSuffix(absUrl, "/") {
 			absUrl += "/"
 		}
-		crawler := crawl.NewCrawler()
-		sitemap, err := crawler.Crawl(absUrl)
-		if err != nil {
-			log.Fatal(err)
-			os.Exit(1)
-		}
-		sitemap.PrettyPrint()
+        sitemap, err := crawl.GetSitemap(absUrl)
+        if err != nil {
+            log.Fatal(err)
+            os.Exit(1)
+        }
+        sitemap.PrettyPrint()
 	}
 
 	app.Run(os.Args)
