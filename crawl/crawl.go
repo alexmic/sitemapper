@@ -55,12 +55,17 @@ func GetSitemap(url string) (*Sitemap, error) {
 				continue
 			}
 
-			// We allow assets to come from a different domain.
+			// We only allow assets to come from a different domain.
 			if !link.isAsset && linkDomain != parentDomain {
 				continue
 			}
 
 			sitemap.AddEntry(link.url, link.parentUrl, link.isAsset)
+
+			// No need to fetch assets.
+			if (link.isAsset) {
+				continue
+			}
 
 			// Ensures we don't visit URLs twice.
 			if seen[link.url] {
